@@ -16,3 +16,4 @@ Thumbs.db
 
 # Flatpak build artifacts
 packaging/flatpak/pnpm-store.tar.gz
+packaging/flatpak/cargo-vendor.tar.gz

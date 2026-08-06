@@ -119,11 +119,32 @@ jobs:
           mkdir -p .cache/pnpm-store-flatpak
           packaging/flatpak/scripts/make-pnpm-store.sh "${{ steps.version.outputs.version }}" packaging/flatpak/pnpm-store.tar.gz .cache/pnpm-store-flatpak
 
+      - name: Restore cargo vendor cache (Flatpak)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .cache/cargo-vendor-flatpak/rustup
+            .cache/cargo-vendor-flatpak/cargo
+          key: cargo-vendor-flatpak-${{ steps.version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            cargo-vendor-flatpak-${{ steps.version.outputs.version }}-
+
+      - name: Prepare cargo vendor (for offline Flatpak build)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # flatpak-builder's build sandbox has no network (nor does Flathub),
+          # so cargo deps must be vendored on the runner and shipped as a local
+          # source, just like the pnpm store.
+          chmod +x packaging/flatpak/scripts/make-cargo-vendor.sh
+          mkdir -p .cache/cargo-vendor-flatpak
+          packaging/flatpak/scripts/make-cargo-vendor.sh "${{ steps.version.outputs.version }}" packaging/flatpak/cargo-vendor.tar.gz .cache/cargo-vendor-flatpak
+
       - name: Build Flatpak (repo + bundle)
         shell: bash
         run: |
           set -euxo pipefail
-          ls -lh packaging/flatpak/pnpm-store.tar.gz
+          ls -lh packaging/flatpak/pnpm-store.tar.gz packaging/flatpak/cargo-vendor.tar.gz
           ok=0
           for i in 1 2 3; do
             rm -rf packaging/flatpak/builddir packaging/flatpak/repo
