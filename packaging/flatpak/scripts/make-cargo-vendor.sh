@@ -70,6 +70,7 @@ curl -fsSL -o "$workdir/protoc.zip" \
   "https://github.com/protocolbuffers/protobuf/releases/download/v${protoc_ver}/protoc-${protoc_ver}-linux-x86_64.zip"
 python3 -m zipfile -e "$workdir/protoc.zip" "$workdir/protoc-bin"
 cp -r "$workdir/protoc-bin/." protoc-bin/
+chmod +x protoc-bin/bin/protoc
 "$PWD/protoc-bin/bin/protoc" --version
 
 mkdir -p "$(dirname "$out_path")"
