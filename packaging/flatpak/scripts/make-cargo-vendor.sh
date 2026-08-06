@@ -39,12 +39,15 @@ export RUSTUP_HOME CARGO_HOME
 mkdir -p "$RUSTUP_HOME" "$CARGO_HOME"
 export PATH="$CARGO_HOME/bin:$PATH"
 
-if ! command -v cargo >/dev/null; then
+if [[ ! -x "${CARGO_HOME}/bin/cargo" ]]; then
   curl -fsSL https://sh.rustup.rs -o "$workdir/rustup-init.sh"
-  sh "$workdir/rustup-init.sh" -y --profile minimal --default-toolchain 1.89.0 --no-modify-path
-  export PATH="$CARGO_HOME/bin:$PATH"
+  sh "$workdir/rustup-init.sh" -y --default-toolchain none --profile minimal --no-modify-path
 fi
+export PATH="$CARGO_HOME/bin:$PATH"
+rustup toolchain install 1.89.0 --profile minimal --no-self-update
+rustup default 1.89.0
 cargo -V
+rustc -V
 
 # Vendors every dependency in Cargo.lock (registry + git, incl. the
 # EasyTier/http_req fork) into ./vendor; modern cargo also writes
