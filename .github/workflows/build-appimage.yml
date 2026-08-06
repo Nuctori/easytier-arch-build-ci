@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          ci/pin-arch-snapshot.sh '${{ steps.version.outputs.arch_snapshot }}'
+          bash ci/pin-arch-snapshot.sh '${{ steps.version.outputs.arch_snapshot }}'
 
       - name: Install build dependencies
         run: |
