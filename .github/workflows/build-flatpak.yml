@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Determine version
         id: version
@@ -75,7 +75,7 @@ jobs:
             org.freedesktop.Sdk.Extension.node20//24.08
 
       - name: Restore flatpak-builder cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: packaging/flatpak/.flatpak-builder/cache
           key: flatpak-builder-cache-${{ hashFiles('packaging/flatpak/io.github.easytier.EasyTierGUI.yml') }}
@@ -83,7 +83,7 @@ jobs:
             flatpak-builder-cache-
 
       - name: Restore pnpm store cache (Flatpak)
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .cache/pnpm-store-flatpak
           key: pnpm-store-flatpak-${{ steps.version.outputs.version }}-pnpm-9.15.4
@@ -127,7 +127,7 @@ jobs:
           popd
 
       - name: Upload Flatpak bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: easytier-gui-flatpak
           path: packaging/flatpak/io.github.easytier.EasyTierGUI.flatpak

@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Determine version
         id: version
@@ -57,15 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          snapshot='${{ steps.version.outputs.arch_snapshot }}'
-          cat > /etc/pacman.d/mirrorlist <<EOF
-          Server = https://archive.archlinux.org/repos/${snapshot}/\$repo/os/\$arch
-          EOF
-          # Downgrading across snapshots may hit transient file ownership conflicts when packages are split/merged.
-          # If this happens, remove the old dropins package and allow pacman to overwrite the one known path.
-          pacman -Syy --noconfirm
-          pacman -Rdd --noconfirm libmakepkg-dropins || true
-          pacman -Syyuu --noconfirm --overwrite /usr/share/makepkg/reproducible/python.sh
+          ci/pin-arch-snapshot.sh '${{ steps.version.outputs.arch_snapshot }}'
 
       - name: Install build dependencies
         run: |
@@ -106,7 +98,7 @@ jobs:
           PY
 
       - name: Restore cache (cargo + pnpm)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             .cache/cargo/registry
@@ -221,7 +213,7 @@ jobs:
 
       - name: Save cache (cargo + pnpm)
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             .cache/cargo/registry
@@ -234,7 +226,7 @@ jobs:
 
       - name: Upload build logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: easytier-gui-build-log-${{ steps.version.outputs.version }}
           path: tauri-build.log
@@ -248,7 +240,7 @@ jobs:
           cp -v .cache/target/release/bundle/appimage/*.AppImage out/
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: easytier-gui-appimage-${{ steps.version.outputs.version }}
           path: out/*.AppImage
