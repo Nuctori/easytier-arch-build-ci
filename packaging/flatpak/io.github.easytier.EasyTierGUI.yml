@@ -108,7 +108,9 @@ modules:
         cd easytier-gui/src-tauri
         cargo build --release --offline --locked --bins --features tauri/custom-protocol
 
-        install -Dm755 target/release/easytier-gui /app/bin/easytier-gui
+        # src-tauri belongs to the root workspace, so the binary lands in the
+        # workspace target dir (two levels up), not under src-tauri/target.
+        install -Dm755 ../../target/release/easytier-gui /app/bin/easytier-gui
         install -Dm644 "$FLATPAK_BUILDER_BUILDDIR/io.github.easytier.EasyTierGUI.desktop" /app/share/applications/io.github.easytier.EasyTierGUI.desktop
         install -Dm644 "$FLATPAK_BUILDER_BUILDDIR/io.github.easytier.EasyTierGUI.metainfo.xml" /app/share/metainfo/io.github.easytier.EasyTierGUI.metainfo.xml
 
