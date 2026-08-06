@@ -33,6 +33,17 @@ B_IP="10.144.144.2"   # node B: peer of A
 A_RPC="127.0.0.1:15888"
 B_RPC="127.0.0.1:15889"  # avoid clashing with A's default RPC portal
 
+# easytier rejects TUNNELS whose source address is loopback by design
+# ("tunnel src host is loopback address") to avoid routing loops in --no-tun
+# mode, so two nodes on one host must peer via the host's real IP — the same
+# situation as two machines on a LAN.
+HOST_IP="$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+if [[ -z "${HOST_IP}" ]]; then
+  echo "cannot determine non-loopback host IP" >&2
+  exit 1
+fi
+echo "peering via host IP ${HOST_IP}"
+
 workdir="$(mktemp -d)"
 A_LOG="${workdir}/node-a.log"
 B_LOG="${workdir}/node-b.log"
@@ -61,21 +72,21 @@ echo "== starting node A (listener, RPC ${A_RPC}, virtual IP ${A_IP}) =="
   >"${A_LOG}" 2>&1 &
 A_PID=$!
 
-echo "== starting node B (--no-listener, peers tcp://127.0.0.1:11010, virtual IP ${B_IP}) =="
+echo "== starting node B (--no-listener, peers tcp://${HOST_IP}:11010, virtual IP ${B_IP}) =="
 "${CORE}" --no-tun --no-listener \
   --network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
-  -i "${B_IP}" -p "tcp://127.0.0.1:11010" --rpc-portal "${B_RPC}" --stun-servers "" \
+  -i "${B_IP}" -p "tcp://${HOST_IP}:11010" --rpc-portal "${B_RPC}" --stun-servers "" \
   >"${B_LOG}" 2>&1 &
 B_PID=$!
 
 # The verification itself lives in python3 so the JSON parsing is robust.
-python3 - "${CLI}" "${A_RPC}" "${B_RPC}" "${A_IP}" "${B_IP}" "${A_LOG}" "${B_LOG}" <<'PY'
+python3 - "${CLI}" "${A_RPC}" "${B_RPC}" "${A_IP}" "${B_IP}" "${A_LOG}" "${B_LOG}" "${HOST_IP}" <<'PY'
 import json
 import subprocess
 import sys
 import time
 
-CLI, A_RPC, B_RPC, A_IP, B_IP, A_LOG, B_LOG = sys.argv[1:]
+CLI, A_RPC, B_RPC, A_IP, B_IP, A_LOG, B_LOG, HOST_IP = sys.argv[1:]
 
 
 def run(*args):
@@ -135,15 +146,15 @@ print(f"OK node A online, virtual IP {ip_a} (peer_id={node_a.get('peer_id')}, ve
 # Diagnostics: is the TCP listener actually accepting? Probe it directly.
 import socket
 
-print("-- listener probe: raw TCP connect to 127.0.0.1:11010 --")
+print("-- listener probe: raw TCP connect to %s:11010 --" % HOST_IP)
 probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 probe.settimeout(5)
 try:
-    probe.connect(("127.0.0.1", 11010))
-    print("raw TCP connect to 127.0.0.1:11010: OK")
+    probe.connect((HOST_IP, 11010))
+    print("raw TCP connect to %s:11010: OK" % HOST_IP)
     probe.close()
 except OSError as exc:
-    print(f"raw TCP connect to 127.0.0.1:11010 FAILED: {exc}")
+    print("raw TCP connect to %s:11010 FAILED: %s" % (HOST_IP, exc))
 
 print("-- socket state --")
 for line in subprocess.run(
