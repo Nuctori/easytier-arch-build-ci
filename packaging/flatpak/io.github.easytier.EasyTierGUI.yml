@@ -25,9 +25,12 @@ modules:
   - name: easytier-gui
     buildsystem: simple
     build-options:
-      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin:/usr/lib/sdk/llvm19/bin
       env:
         LIBCLANG_PATH: /usr/lib/sdk/llvm19/lib
+        BINDGEN_EXTRA_CLANG_ARGS: >-
+          -I/usr/lib/sdk/llvm19/include
+          -I/usr/include
         CARGO_HOME: /run/build/easytier-gui/.cache/cargo
         RUSTUP_HOME: /run/build/easytier-gui/.cache/rustup
         PNPM_HOME: /run/build/easytier-gui/.cache/pnpm-home
