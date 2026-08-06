@@ -10,7 +10,7 @@ sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
   - org.freedesktop.Sdk.Extension.node20
   # kcp-sys builds C bindings with bindgen, which needs libclang.
-  - org.freedesktop.Sdk.Extension.llvm17
+  - org.freedesktop.Sdk.Extension.llvm19
 
 command: easytier-gui
 
@@ -27,7 +27,7 @@ modules:
     build-options:
       append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
       env:
-        LIBCLANG_PATH: /usr/lib/sdk/llvm17/lib
+        LIBCLANG_PATH: /usr/lib/sdk/llvm19/lib
         CARGO_HOME: /run/build/easytier-gui/.cache/cargo
         RUSTUP_HOME: /run/build/easytier-gui/.cache/rustup
         PNPM_HOME: /run/build/easytier-gui/.cache/pnpm-home
