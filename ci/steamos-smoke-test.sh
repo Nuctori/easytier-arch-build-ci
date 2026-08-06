@@ -117,14 +117,17 @@ def route_ips(rpc):
     if r.returncode != 0:
         return []
     data = json.loads(r.stdout)
-    return [pr.get("route", {}).get("ipv4_addr", "") for pr in data.get("peer_routes", [])]
+    return [
+        (pr.get("route", {}).get("ipv4_addr", "") or "").split("/", 1)[0]
+        for pr in data.get("peer_routes", [])
+    ]
 
 
 print("-- node A must come up and report its virtual IP --")
 node_a = node_ip(A_RPC)
 if node_a is False:
     sys.exit(f"node A RPC never became ready\nA log tail:\n{tail(A_LOG)}")
-ip_a = node_a.get("ipv4_addr", "")
+ip_a = (node_a.get("ipv4_addr") or "").split("/", 1)[0]  # may be "10.144.144.1/24"
 if ip_a != A_IP:
     sys.exit(f"node A reported ipv4_addr={ip_a!r}, expected {A_IP!r}")
 print(f"OK node A online, virtual IP {ip_a} (peer_id={node_a.get('peer_id')}, version={node_a.get('version')})")
