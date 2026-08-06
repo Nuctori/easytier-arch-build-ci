@@ -1,17 +1,30 @@
-# EasyTier Arch Package (GitHub Actions)
+# EasyTier Arch Package & SteamOS CI
 
-This repository builds EasyTier into Arch Linux packages (`.pkg.tar.zst`) using GitHub Actions.
+This repository builds EasyTier for Arch Linux and ensures it actually runs on
+**SteamOS / Steam Deck** — all enforced by GitHub Actions.
 
 ## What it builds
 
-- `easytier` package
+- `easytier` package (Arch: `.pkg.tar.zst`)
   - `easytier-core`
   - `easytier-cli`
   - `easytier-web`
-- `easytier-gui` package
-  - `easytier-gui` (Tauri desktop app)
+- `easytier-gui` package / AppImage / Flatpak (Tauri desktop app)
 
-Source code is fetched from: https://github.com/EasyTier/EasyTier
+Source code is fetched from: <https://github.com/EasyTier/EasyTier>
+
+## Workflows (the closed loop)
+
+| Workflow | Artifacts | Verifies |
+| --- | --- | --- |
+| `build-archpkg` | `*.pkg.tar.zst` | Arch package builds |
+| `build-appimage` | `*.AppImage` | GUI bundles as a single file, **built against SteamOS's glibc (2.41)** |
+| `steamos-smoke-test` | `easytier-steamos-<ver>-x86_64.tar.gz` | **Binaries actually run on SteamOS**: built against glibc 2.41, then a real two-node `--no-tun` virtual network is started and peer connectivity is verified via `easytier-cli` |
+| `build-flatpak` | `*.flatpak` bundle | GUI builds **fully offline** (same constraints as Flathub) |
+
+A green run of all four means: the package compiles, the single-file AppImage
+and the Flatpak both build, and the CLI/core binaries demonstrably work on a
+Steam Deck.
 
 ## Local build (on Arch)
 
@@ -26,12 +39,6 @@ makepkg -s
 ```
 
 The package files will be created in `packaging/arch/`.
-
-## CI build (GitHub Actions)
-
-- Workflow: `.github/workflows/build-archpkg.yml`
-- Uses `archlinux:base-devel` container
-- Runs `makepkg` and uploads artifacts
 
 ## SteamOS / Steam Deck (single file)
 
@@ -54,14 +61,52 @@ Notes:
 - If you see `GLIBC_2.42 not found` on SteamOS (glibc 2.41), rebuild the AppImage using an older Arch Linux Archive snapshot:
   - `workflow_dispatch` input `arch_snapshot` (default: `2025/07/01`)
 
+## SteamOS smoke test (core/cli/web)
+
+The `steamos-smoke-test` workflow closes the loop: it doesn't just compile the
+binaries, it runs them on a SteamOS-equivalent environment.
+
+1. Pins pacman to an Arch Linux Archive snapshot with **glibc <= 2.41**
+   (SteamOS 3.7 ships glibc 2.41) via `ci/pin-arch-snapshot.sh`.
+2. Builds `easytier-core`, `easytier-cli`, `easytier-web` against that runtime.
+3. Static check: the max `GLIBC_` symbol each binary requires is <= 2.41.
+4. Runtime check (`ci/steamos-smoke-test.sh`): starts two `--no-tun`
+   easytier nodes on the host, connects them as peers, and asserts each node
+   sees the other's virtual IP in its route table through `easytier-cli`.
+   `--no-tun` matches SteamOS Desktop Mode without root/TUN setup.
+
+Trigger manually via `workflow_dispatch` to pick a different `arch_snapshot`.
+The produced `easytier-steamos-<ver>-x86_64.tar.gz` is a drop-in tarball of
+SteamOS-compatible binaries.
+
+### Why the snapshot pinning is non-trivial
+
+Archive snapshots are signed by packager keys that the rolling container's
+`archlinux-keyring` has since disabled/added, so no single keyring can verify a
+snapshot. `ci/pin-arch-snapshot.sh` therefore sets `SigLevel = Never` for the
+throwaway CI container (packages still come from the official archive over
+HTTPS) and uses `--overwrite '*'` to survive split/merged package conflicts
+(e.g. `gcc-libs` vs `libgomp/libstdc++/...`).
+
 ## Flatpak (SteamOS recommended)
 
 SteamOS may have issues running AppImage (FUSE/glibc/Wayland/WebKitGTK). Flatpak is usually the most reliable option.
 
 - Manifest: `packaging/flatpak/io.github.easytier.EasyTierGUI.yml`
 - CI workflow (test build): `.github/workflows/build-flatpak.yml`
+- Builds on the **GNOME runtime/SDK** (bundles WebKitGTK 4.1, required by Tauri v2).
 
-Flathub note: Flathub builds are offline. This repo’s CI pre-generates a `pnpm` store tarball and uses `pnpm install --offline`; for Flathub you should pin that tarball as a remote source (or generate `generated-sources*.json`).
+Flathub note: Flathub builds are **offline** (and so is flatpak-builder's build
+sandbox by default — no amount of DNS workarounds helps). This repo therefore
+pre-generates *both* offline stores and ships them as local manifest sources:
+
+- `pnpm` store tarball (`packaging/flatpak/pnpm-store.tar.gz`) → `pnpm install --offline`
+- vendored cargo deps (`packaging/flatpak/cargo-vendor.tar.gz`) → `cargo build --offline`
+
+Both are produced by CI scripts in `packaging/flatpak/scripts/`
+(`make-pnpm-store.sh`, `make-cargo-vendor.sh`) and cached. For Flathub
+submission you should pin those tarballs as remote sources (or generate
+`generated-sources*.json`).
 
 ## Notes
 

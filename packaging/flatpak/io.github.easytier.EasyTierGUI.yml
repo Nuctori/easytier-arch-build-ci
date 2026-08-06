@@ -9,6 +9,8 @@ sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
   - org.freedesktop.Sdk.Extension.node20
+  # kcp-sys builds C bindings with bindgen, which needs libclang.
+  - org.freedesktop.Sdk.Extension.llvm17
 
 command: easytier-gui
 
@@ -25,6 +27,7 @@ modules:
     build-options:
       append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
       env:
+        LIBCLANG_PATH: /usr/lib/sdk/llvm17/lib
         CARGO_HOME: /run/build/easytier-gui/.cache/cargo
         RUSTUP_HOME: /run/build/easytier-gui/.cache/rustup
         PNPM_HOME: /run/build/easytier-gui/.cache/pnpm-home
@@ -81,9 +84,12 @@ modules:
         fi
 
         # Unpack the vendored cargo deps (vendor/ + .cargo/config.toml that
-        # redirects every source to ./vendor) and build fully offline. The
-        # archive source is extracted flat: $PWD is the source root.
+        # redirects every source to ./vendor, plus the bundled protoc) and
+        # build fully offline. The archive source is extracted flat: $PWD is
+        # the source root.
         tar -xzf "$FLATPAK_BUILDER_BUILDDIR/cargo-vendor.tar.gz" -C .
+        export PATH="$PWD/protoc-bin/bin:$PATH"
+        export PROTOC="$PWD/protoc-bin/bin/protoc"
         "$PNPM" config set store-dir "$PNPM_STORE_PATH"
         "$PNPM" config set dangerouslyAllowAllBuilds true
         "$PNPM" config set fetch-retries 7

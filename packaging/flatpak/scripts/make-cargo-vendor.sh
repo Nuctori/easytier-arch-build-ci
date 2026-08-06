@@ -62,8 +62,18 @@ else
   cp "$workdir/cargo-vendor-config.toml" .cargo/config.toml
 fi
 
+# protoc: prost-build needs the protoc compiler at build time and the flatpak
+# SDK does not ship one. Bundle the official Linux x86_64 binary (the source
+# tree only auto-downloads protoc for Windows).
+protoc_ver="29.3"
+curl -fsSL -o "$workdir/protoc.zip" \
+  "https://github.com/protocolbuffers/protobuf/releases/download/v${protoc_ver}/protoc-${protoc_ver}-linux-x86_64.zip"
+python3 -m zipfile -e "$workdir/protoc.zip" "$workdir/protoc-bin"
+cp -r "$workdir/protoc-bin/." protoc-bin/
+"$PWD/protoc-bin/bin/protoc" --version
+
 mkdir -p "$(dirname "$out_path")"
-tar -czf "$out_path" vendor .cargo
+tar -czf "$out_path" vendor .cargo protoc-bin
 
 if [[ ! -s "${out_path}" ]]; then
   echo "cargo vendor tarball is missing/empty: ${out_path}" >&2
