@@ -34,6 +34,15 @@ fi
 pacman -U --noconfirm \
   "https://archive.archlinux.org/repos/${snapshot}/core/os/x86_64/${keyring_pkg}"
 
+# The container's LOCAL trustdb (/etc/pacman.d/gnupg) was populated when the
+# image was built, from the FRESH keyring — it marks snapshot-era packager
+# keys as disabled and the auto-populate hook on `pacman -U` only merges, it
+# does not clear that state. Rebuild the trustdb from the snapshot-era keyring
+# files (fully offline) so those keys verify again.
+rm -rf /etc/pacman.d/gnupg
+pacman-key --init
+pacman-key --populate archlinux
+
 # Downgrade the whole system to the snapshot.
 # - libmakepkg-dropins: a newer split/dropin package from the rolling image can
 #   conflict during downgrade; the snapshot era does not need it.
