@@ -93,11 +93,13 @@ import struct
 
 
 def ipv4_from_proto(v):
-    """route.ipv4_addr is a proto common.Ipv4Addr ({'addr': uint32})."""
+    """route.ipv4_addr is proto Ipv4Inet ({'address': {'addr': uint32}})."""
     if isinstance(v, str):
         return v.split("/", 1)[0]
-    if isinstance(v, dict) and v.get("addr") is not None:
-        return _socket.inet_ntoa(struct.pack("!I", int(v["addr"])))
+    if isinstance(v, dict):
+        addr = v.get("address", v)  # Ipv4Inet -> Ipv4Addr -> uint32
+        if isinstance(addr, dict) and addr.get("addr") is not None:
+            return _socket.inet_ntoa(struct.pack("!I", int(addr["addr"])))
     return ""
 
 
@@ -186,8 +188,12 @@ def wait_for_route_a():
 
 
 if not wait_for(wait_for_route_a):
+    raw = run(CLI, "-p", A_RPC, "-v", "route")
+    raw_peer = run(CLI, "-p", A_RPC, "-v", "peer")
     sys.exit(
         f"node A never saw node B ({B_IP}) in its route table\n"
+        f"raw route output:\n{raw.stdout[:3000]}\n"
+        f"raw peer output:\n{raw_peer.stdout[:3000]}\n"
         f"A log tail:\n{tail(A_LOG)}\nB log tail:\n{tail(B_LOG)}"
     )
 print(f"OK node A sees node B: {route_ips(A_RPC)}")
