@@ -51,6 +51,26 @@ jobs:
           EOF
           tail -n 20 /etc/hosts
 
+      - name: Pin cargo hostnames (sandbox DNS workaround)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # cargo's git/registry fetches run inside the flatpak-builder sandbox,
+          # where DNS intermittently fails ("failed to resolve address for
+          # github.com: Temporary failure in name resolution"). Resolve on the
+          # runner (host DNS works) and pin the current IPs in /etc/hosts,
+          # which bubblewrap shares into the sandbox. Self-healing if the
+          # Anycast IPs change.
+          for h in github.com crates.io static.crates.io index.crates.io; do
+            getent ahostsv4 "$h" \
+              | awk '{print $1}' \
+              | sort -u \
+              | head -n 8 \
+              | while read -r ip; do echo "${ip} ${h}"; done \
+              | sudo tee -a /etc/hosts >/dev/null
+          done
+          tail -n 20 /etc/hosts
+
       - name: Install Flatpak tooling
         shell: bash
         run: |

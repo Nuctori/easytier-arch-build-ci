@@ -53,6 +53,17 @@ modules:
         export PATH="$CARGO_HOME/bin:$PATH"
         export NODE_OPTIONS="${NODE_OPTIONS:-} --dns-result-order=ipv4first"
 
+        # cargo's libgit2 resolver is flaky inside the sandbox; use the git CLI
+        # and retry network ops so the registry/git fetch warms reliably.
+        mkdir -p "$CARGO_HOME"
+        cat > "$CARGO_HOME/config.toml" <<'EOF'
+        [net]
+        git-fetch-with-cli = true
+        retry = 10
+        [registries.crates-io]
+        protocol = "sparse"
+        EOF
+
         mkdir -p "$PNPM_HOME/bin" "$PNPM_STORE_PATH"
         install -Dm755 "$FLATPAK_BUILDER_BUILDDIR/pnpm-linuxstatic-x64" "$PNPM_HOME/bin/pnpm"
         PNPM="$PNPM_HOME/bin/pnpm"
