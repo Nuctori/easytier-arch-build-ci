@@ -44,8 +44,10 @@ pacman-key --init
 pacman-key --populate archlinux
 
 # Downgrade the whole system to the snapshot.
-# - libmakepkg-dropins: a newer split/dropin package from the rolling image can
-#   conflict during downgrade; the snapshot era does not need it.
-# - --overwrite python.sh: its ownership changed across snapshots.
+# - --overwrite '*': the rolling image splits libs into separate packages
+#   (libgomp/libstdc++/libtsan/... ) that the snapshot-era gcc-libs owns
+#   directly; without overwriting, the downgrade aborts on file conflicts.
+#   Safe here: this is a throwaway CI container.
+# - libmakepkg-dropins: newer split/dropin package, not needed for the snapshot.
 pacman -Rdd --noconfirm libmakepkg-dropins || true
-pacman -Syyuu --noconfirm --overwrite /usr/share/makepkg/reproducible/python.sh
+pacman -Syyuu --noconfirm --overwrite '*'
