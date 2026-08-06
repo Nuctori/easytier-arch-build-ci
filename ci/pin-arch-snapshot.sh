@@ -9,7 +9,7 @@ set -euo pipefail
 
 snapshot="${1:?usage: pin-arch-snapshot.sh <YYYY/MM/DD>}"
 
-cat > /etc/pacman.d/mirrorlist <<EOF
+cat >/etc/pacman.d/mirrorlist <<EOF
 Server = https://archive.archlinux.org/repos/${snapshot}/\$repo/os/\$arch
 EOF
 

@@ -18,20 +18,20 @@ CORE="${BIN_DIR}/easytier-core"
 CLI="${BIN_DIR}/easytier-cli"
 
 if [[ ! -x "${CORE}" ]]; then
-  echo "missing easytier-core: ${CORE}" >&2
-  exit 1
+	echo "missing easytier-core: ${CORE}" >&2
+	exit 1
 fi
 if [[ ! -x "${CLI}" ]]; then
-  echo "missing easytier-cli: ${CLI}" >&2
-  exit 1
+	echo "missing easytier-cli: ${CLI}" >&2
+	exit 1
 fi
 
 NETWORK_NAME="ci-steamos-$(date +%s)-$$"
 NETWORK_SECRET="ci-steamos-secret"
-A_IP="10.144.144.1"   # node A: listener
-B_IP="10.144.144.2"   # node B: peer of A
+A_IP="10.144.144.1" # node A: listener
+B_IP="10.144.144.2" # node B: peer of A
 A_RPC="127.0.0.1:15888"
-B_RPC="127.0.0.1:15889"  # avoid clashing with A's default RPC portal
+B_RPC="127.0.0.1:15889" # avoid clashing with A's default RPC portal
 
 # easytier rejects TUNNELS whose source address is loopback by design
 # ("tunnel src host is loopback address") to avoid routing loops in --no-tun
@@ -39,8 +39,8 @@ B_RPC="127.0.0.1:15889"  # avoid clashing with A's default RPC portal
 # situation as two machines on a LAN.
 HOST_IP="$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -n1)"
 if [[ -z "${HOST_IP}" ]]; then
-  echo "cannot determine non-loopback host IP" >&2
-  exit 1
+	echo "cannot determine non-loopback host IP" >&2
+	exit 1
 fi
 echo "peering via host IP ${HOST_IP}"
 
@@ -51,10 +51,10 @@ A_PID=""
 B_PID=""
 
 cleanup() {
-  if [[ -n "${B_PID}" ]]; then kill "${B_PID}" 2>/dev/null || true; fi
-  if [[ -n "${A_PID}" ]]; then kill "${A_PID}" 2>/dev/null || true; fi
-  wait 2>/dev/null || true
-  rm -rf "${workdir}"
+	if [[ -n "${B_PID}" ]]; then kill "${B_PID}" 2>/dev/null || true; fi
+	if [[ -n "${A_PID}" ]]; then kill "${A_PID}" 2>/dev/null || true; fi
+	wait 2>/dev/null || true
+	rm -rf "${workdir}"
 }
 trap cleanup EXIT
 
@@ -62,21 +62,21 @@ echo "== version checks (binaries must load under SteamOS glibc) =="
 "${CORE}" --version
 "${CLI}" --version
 if [[ -x "${BIN_DIR}/easytier-web" ]]; then
-  "${BIN_DIR}/easytier-web" --version
+	"${BIN_DIR}/easytier-web" --version
 fi
 
 echo "== starting node A (listener, RPC ${A_RPC}, virtual IP ${A_IP}) =="
 "${CORE}" --no-tun \
-  --network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
-  -i "${A_IP}" --rpc-portal "${A_RPC}" --stun-servers "" \
-  >"${A_LOG}" 2>&1 &
+	--network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
+	-i "${A_IP}" --rpc-portal "${A_RPC}" --stun-servers "" \
+	>"${A_LOG}" 2>&1 &
 A_PID=$!
 
 echo "== starting node B (--no-listener, peers tcp://${HOST_IP}:11010, virtual IP ${B_IP}) =="
 "${CORE}" --no-tun --no-listener \
-  --network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
-  -i "${B_IP}" -p "tcp://${HOST_IP}:11010" --rpc-portal "${B_RPC}" --stun-servers "" \
-  >"${B_LOG}" 2>&1 &
+	--network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
+	-i "${B_IP}" -p "tcp://${HOST_IP}:11010" --rpc-portal "${B_RPC}" --stun-servers "" \
+	>"${B_LOG}" 2>&1 &
 B_PID=$!
 
 # The verification itself lives in python3 so the JSON parsing is robust.

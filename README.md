@@ -1,5 +1,7 @@
 # EasyTier Arch Package & SteamOS CI
 
+> English | [简体中文](README_CN.md)
+
 This repository builds EasyTier for Arch Linux and ensures it actually runs on
 **SteamOS / Steam Deck** — all enforced by GitHub Actions.
 

@@ -25,8 +25,8 @@ tar -xf "$workdir/easytier-src.tar.gz" -C "$workdir"
 
 src_root="$(find "$workdir" -maxdepth 1 -type d -name "EasyTier-*" | head -n 1)"
 if [[ -z "${src_root}" ]]; then
-  echo "Failed to locate extracted EasyTier sources" >&2
-  exit 1
+	echo "Failed to locate extracted EasyTier sources" >&2
+	exit 1
 fi
 
 cd "$src_root"
@@ -45,8 +45,8 @@ tar -czf "$out_path" -C "$store_dir" .
 
 # Sanity check: the tarball must survive outside the temp workdir.
 if [[ ! -s "${out_path}" ]]; then
-  echo "pnpm store tarball is missing/empty: ${out_path}" >&2
-  exit 1
+	echo "pnpm store tarball is missing/empty: ${out_path}" >&2
+	exit 1
 fi
 
 echo "Wrote ${out_path} ($(du -h "${out_path}" | cut -f1))"
