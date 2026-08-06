@@ -50,14 +50,17 @@ cargo -V
 rustc -V
 
 # Vendors every dependency in Cargo.lock (registry + git, incl. the
-# EasyTier/http_req fork) into ./vendor; modern cargo also writes
-# vendor/config.toml with the source-replacement rules.
-cargo vendor vendor --locked
+# EasyTier/http_req fork) into ./vendor. cargo prints the source-replacement
+# config to stdout (some versions also write vendor/config.toml); capture it
+# into the project-level .cargo/config.toml so the offline build applies it.
+cargo vendor vendor --locked > "$workdir/cargo-vendor-config.toml"
 
-# Make the replacement config apply to the workspace build: the project-level
-# .cargo/config.toml is picked up by `cargo build` in any member dir.
 mkdir -p .cargo
-cp vendor/config.toml .cargo/config.toml
+if [[ -f vendor/config.toml ]]; then
+  cp vendor/config.toml .cargo/config.toml
+else
+  cp "$workdir/cargo-vendor-config.toml" .cargo/config.toml
+fi
 
 mkdir -p "$(dirname "$out_path")"
 tar -czf "$out_path" vendor .cargo
