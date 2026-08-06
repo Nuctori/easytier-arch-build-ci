@@ -88,6 +88,18 @@ import time
 
 CLI, A_RPC, B_RPC, A_IP, B_IP, A_LOG, B_LOG, HOST_IP = sys.argv[1:]
 
+import socket as _socket
+import struct
+
+
+def ipv4_from_proto(v):
+    """route.ipv4_addr is a proto common.Ipv4Addr ({'addr': uint32})."""
+    if isinstance(v, str):
+        return v.split("/", 1)[0]
+    if isinstance(v, dict) and v.get("addr") is not None:
+        return _socket.inet_ntoa(struct.pack("!I", int(v["addr"])))
+    return ""
+
 
 def run(*args):
     return subprocess.run(args, capture_output=True, text=True, timeout=30)
@@ -129,7 +141,7 @@ def route_ips(rpc):
         return []
     data = json.loads(r.stdout)
     return [
-        (pr.get("route", {}).get("ipv4_addr", "") or "").split("/", 1)[0]
+        ipv4_from_proto(pr.get("route", {}).get("ipv4_addr"))
         for pr in data.get("peer_routes", [])
     ]
 
