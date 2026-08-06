@@ -2,14 +2,18 @@
 set -euo pipefail
 
 version="${1:-2.4.5}"
-out_path="${2:-packaging/flatpak/pnpm-store.tar.gz}"
+# Resolve to absolute paths BEFORE any `cd` below: the script later enters the
+# extracted source dir, and a relative out_path would land inside the temp
+# workdir, which the EXIT trap then deletes (the old file appeared to be
+# written, but vanished before the flatpak-builder step ran).
+out_path="$(realpath -m "${2:-packaging/flatpak/pnpm-store.tar.gz}")"
 store_dir_arg="${3:-}"
 
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
 pnpm_bin="$workdir/pnpm"
-store_dir="${store_dir_arg:-$workdir/pnpm-store}"
+store_dir="$(realpath -m "${store_dir_arg:-$workdir/pnpm-store}")"
 
 mkdir -p "$store_dir"
 
@@ -39,4 +43,11 @@ cd "$src_root"
 mkdir -p "$(dirname "$out_path")"
 tar -czf "$out_path" -C "$store_dir" .
 
-echo "Wrote $out_path"
+# Sanity check: the tarball must survive outside the temp workdir.
+if [[ ! -s "${out_path}" ]]; then
+  echo "pnpm store tarball is missing/empty: ${out_path}" >&2
+  exit 1
+fi
+
+echo "Wrote ${out_path} ($(du -h "${out_path}" | cut -f1))"
+ls -lh "$(dirname "${out_path}")"

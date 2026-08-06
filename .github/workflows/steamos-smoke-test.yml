@@ -1,0 +1,213 @@
+name: steamos-smoke-test
+
+# Closes the loop: build easytier against the same glibc as SteamOS 3.7
+# (glibc 2.41) and then actually RUN it — version checks plus a real two-node
+# virtual network using easytier's --no-tun (no root) mode, verified through
+# easytier-cli. A green run means the shipped binaries load and work on a
+# Steam Deck.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      arch_snapshot:
+        description: "Arch Linux Archive snapshot (YYYY/MM/DD) to match SteamOS glibc (<= 2.41)"
+        required: false
+        default: "2025/07/01"
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version and arch snapshot
+        id: version
+        shell: bash
+        env:
+          INPUT_ARCH_SNAPSHOT: ${{ github.event.inputs.arch_snapshot }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^pkgver=//p' packaging/arch/PKGBUILD | head -n 1)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          # SteamOS 3.7 ships glibc 2.41; pin pacman to an archive snapshot
+          # whose glibc is <= 2.41 so the binaries are compatible.
+          snapshot="${INPUT_ARCH_SNAPSHOT:-2025/07/01}"
+          echo "arch_snapshot=${snapshot}" >> "$GITHUB_OUTPUT"
+
+      - name: Pin pacman to Arch Linux Archive snapshot (SteamOS glibc)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          snapshot='${{ steps.version.outputs.arch_snapshot }}'
+          cat > /etc/pacman.d/mirrorlist <<EOF
+          Server = https://archive.archlinux.org/repos/${snapshot}/\$repo/os/\$arch
+          EOF
+          pacman -Syy --noconfirm
+          pacman -Rdd --noconfirm libmakepkg-dropins || true
+          pacman -Syyuu --noconfirm --overwrite /usr/share/makepkg/reproducible/python.sh
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            curl tar xz \
+            rustup protobuf git \
+            clang llvm pkgconf zstd \
+            python
+
+      - name: Verify glibc version (must match SteamOS 3.7, glibc <= 2.41)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          glibc_ver="$(ldd --version | awk 'NR==1{print $NF}')"
+          echo "Container glibc: ${glibc_ver}"
+          export GLIBC_VER="$glibc_ver"
+          python - <<'PY'
+          import os, re, sys
+          v = os.environ["GLIBC_VER"]
+          def parse(ver: str):
+              m = re.match(r"^(\d+)\.(\d+)", ver.strip())
+              if not m:
+                  raise SystemExit(f"cannot parse glibc version: {ver!r}")
+              return int(m.group(1)), int(m.group(2))
+          cur = parse(v)
+          max_ok = parse("2.41")
+          if cur > max_ok:
+              raise SystemExit(
+                  f"glibc {v} is too new for SteamOS (2.41). "
+                  f"Choose an older arch_snapshot (YYYY/MM/DD) so glibc<=2.41."
+              )
+          PY
+
+      - name: Install Rust toolchain (easytier MSRV)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export CARGO_HOME="$GITHUB_WORKSPACE/.cache/cargo"
+          export RUSTUP_HOME="$GITHUB_WORKSPACE/.cache/rustup"
+          export PATH="$CARGO_HOME/bin:$PATH"
+
+          rustup set profile minimal
+          rustup toolchain install 1.89.0 --no-self-update
+          rustup default 1.89.0
+
+          rustc -V
+          cargo -V
+
+      - name: Restore cargo cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache/cargo/registry
+            .cache/cargo/git
+            .cache/rustup
+            .cache/target
+          key: steamos-cache-${{ steps.version.outputs.version }}-${{ github.run_id }}
+          restore-keys: |
+            steamos-cache-${{ steps.version.outputs.version }}-
+            steamos-cache-
+
+      - name: Download EasyTier sources
+        run: |
+          set -euxo pipefail
+          curl -L -o easytier-src.tar.gz "https://github.com/EasyTier/EasyTier/archive/refs/tags/v${{ steps.version.outputs.version }}.tar.gz"
+          tar -xf easytier-src.tar.gz
+
+      - name: Build easytier-core / easytier-cli / easytier-web
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "EasyTier-${{ steps.version.outputs.version }}"
+
+          export CARGO_HOME="$GITHUB_WORKSPACE/.cache/cargo"
+          export RUSTUP_HOME="$GITHUB_WORKSPACE/.cache/rustup"
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/.cache/target"
+          export PATH="$CARGO_HOME/bin:$PATH"
+
+          # Same toolchain-flag sanitization as packaging/arch/PKGBUILD (GCC LTO
+          # objects + lld can break ring/kcp linking).
+          export CFLAGS="${CFLAGS//-flto=auto/}"
+          export CXXFLAGS="${CXXFLAGS//-flto=auto/}"
+          export LDFLAGS="${LDFLAGS//-flto=auto/}"
+          export LDFLAGS="${LDFLAGS//-fuse-ld=lld/}"
+
+          # kcp-sys uses bindgen -> needs libclang
+          export LIBCLANG_PATH="$(llvm-config --libdir)"
+          # zstd-sys can use the system libzstd
+          export ZSTD_SYS_USE_PKG_CONFIG=1
+
+          cargo build --release --locked -p easytier --bin easytier-core --bin easytier-cli
+          cargo build --release --locked -p easytier-web --bin easytier-web
+
+      - name: Static glibc requirement check
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          ok = True
+          for bin_name in ("easytier-core", "easytier-cli", "easytier-web"):
+              path = f".cache/target/release/{bin_name}"
+              out = subprocess.run(
+                  ["objdump", "-T", path], capture_output=True, text=True
+              ).stdout
+              vers = {
+                  (int(m.group(1)), int(m.group(2)))
+                  for m in re.finditer(r"GLIBC_(\d+)\.(\d+)", out)
+              }
+              if not vers:
+                  print(f"{bin_name}: no GLIBC_ symbols found (fully static?)")
+                  continue
+              maxv = max(vers)
+              good = maxv <= (2, 41)  # SteamOS 3.7 ships glibc 2.41
+              print(
+                  f"{bin_name}: max required GLIBC_{maxv[0]}.{maxv[1]} "
+                  f"-> {'OK (<= SteamOS 2.41)' if good else 'TOO NEW for SteamOS'}"
+              )
+              ok = ok and good
+          sys.exit(0 if ok else 1)
+          PY
+
+      - name: Smoke test on SteamOS-equivalent runtime
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ci/steamos-smoke-test.sh "$GITHUB_WORKSPACE/.cache/target/release"
+
+      - name: Package SteamOS-compatible binaries
+        run: |
+          set -euxo pipefail
+          mkdir -p out/easytier
+          cp -v .cache/target/release/easytier-core \
+                .cache/target/release/easytier-cli \
+                .cache/target/release/easytier-web \
+                out/easytier/
+          tar -C out -czf "out/easytier-steamos-${{ steps.version.outputs.version }}-x86_64.tar.gz" easytier
+          ls -lh out/
+
+      - name: Save cargo cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache/cargo/registry
+            .cache/cargo/git
+            .cache/rustup
+            .cache/target
+          key: steamos-cache-${{ steps.version.outputs.version }}-${{ github.run_id }}
+
+      - name: Upload SteamOS binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: easytier-steamos-binaries-${{ steps.version.outputs.version }}
+          path: out/easytier-steamos-${{ steps.version.outputs.version }}-x86_64.tar.gz
