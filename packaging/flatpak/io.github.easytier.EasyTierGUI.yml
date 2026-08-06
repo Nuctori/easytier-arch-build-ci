@@ -1,7 +1,10 @@
 app-id: io.github.easytier.EasyTierGUI
-runtime: org.freedesktop.Platform
-runtime-version: "24.08"
-sdk: org.freedesktop.Sdk
+# GNOME runtime/SDK: ships WebKitGTK 4.1 (javascriptcoregtk-4.1.pc etc.), which
+# the Tauri v2 stack requires at build time and the app needs at runtime.
+# The freedesktop rust/node SDK extensions load into it via /usr/lib/sdk.
+runtime: org.gnome.Platform
+runtime-version: "47"
+sdk: org.gnome.Sdk
 
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable

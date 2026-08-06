@@ -88,9 +88,11 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          # GNOME SDK bundles WebKitGTK 4.1 (needed by the Tauri build); the
+          # rust/node toolchains come from the freedesktop SDK extensions.
           sudo flatpak install -y flathub \
-            org.freedesktop.Platform//24.08 \
-            org.freedesktop.Sdk//24.08 \
+            org.gnome.Platform//47 \
+            org.gnome.Sdk//47 \
             org.freedesktop.Sdk.Extension.rust-stable//24.08 \
             org.freedesktop.Sdk.Extension.node20//24.08
 
