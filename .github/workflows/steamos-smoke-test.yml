@@ -126,7 +126,9 @@ jobs:
           export PATH="$CARGO_HOME/bin:$PATH"
 
           # Same toolchain-flag sanitization as packaging/arch/PKGBUILD (GCC LTO
-          # objects + lld can break ring/kcp linking).
+          # objects + lld can break ring/kcp linking). Default to empty when the
+          # container does not export these (nounset-safe).
+          export CFLAGS="${CFLAGS:-}" CXXFLAGS="${CXXFLAGS:-}" LDFLAGS="${LDFLAGS:-}"
           export CFLAGS="${CFLAGS//-flto=auto/}"
           export CXXFLAGS="${CXXFLAGS//-flto=auto/}"
           export LDFLAGS="${LDFLAGS//-flto=auto/}"
