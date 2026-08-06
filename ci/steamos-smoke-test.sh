@@ -57,14 +57,14 @@ fi
 echo "== starting node A (listener, RPC ${A_RPC}, virtual IP ${A_IP}) =="
 "${CORE}" --no-tun \
   --network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
-  -i "${A_IP}" --rpc-portal "${A_RPC}" \
+  -i "${A_IP}" --rpc-portal "${A_RPC}" --stun-servers "" \
   >"${A_LOG}" 2>&1 &
 A_PID=$!
 
 echo "== starting node B (--no-listener, peers tcp://127.0.0.1:11010, virtual IP ${B_IP}) =="
 "${CORE}" --no-tun --no-listener \
   --network-name "${NETWORK_NAME}" --network-secret "${NETWORK_SECRET}" \
-  -i "${B_IP}" -p "tcp://127.0.0.1:11010" --rpc-portal "${B_RPC}" \
+  -i "${B_IP}" -p "tcp://127.0.0.1:11010" --rpc-portal "${B_RPC}" --stun-servers "" \
   >"${B_LOG}" 2>&1 &
 B_PID=$!
 
@@ -131,6 +131,29 @@ ip_a = (node_a.get("ipv4_addr") or "").split("/", 1)[0]  # may be "10.144.144.1/
 if ip_a != A_IP:
     sys.exit(f"node A reported ipv4_addr={ip_a!r}, expected {A_IP!r}")
 print(f"OK node A online, virtual IP {ip_a} (peer_id={node_a.get('peer_id')}, version={node_a.get('version')})")
+
+# Diagnostics: is the TCP listener actually accepting? Probe it directly.
+import socket
+
+print("-- listener probe: raw TCP connect to 127.0.0.1:11010 --")
+probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+probe.settimeout(5)
+try:
+    probe.connect(("127.0.0.1", 11010))
+    print("raw TCP connect to 127.0.0.1:11010: OK")
+    probe.close()
+except OSError as exc:
+    print(f"raw TCP connect to 127.0.0.1:11010 FAILED: {exc}")
+
+print("-- socket state --")
+for line in subprocess.run(
+    ["ss", "-tlnp"], capture_output=True, text=True, timeout=10
+).stdout.splitlines():
+    if "11010" in line or "11011" in line or "11012" in line or "15888" in line:
+        print(line)
+
+print("-- network namespaces --")
+print(subprocess.run(["ip", "netns", "list"], capture_output=True, text=True).stdout or "(none)")
 
 print(f"-- node A must learn a route to node B ({B_IP}) --")
 
