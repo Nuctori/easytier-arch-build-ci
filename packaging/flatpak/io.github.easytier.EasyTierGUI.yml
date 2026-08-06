@@ -78,8 +78,9 @@ modules:
         fi
 
         # Unpack the vendored cargo deps (vendor/ + .cargo/config.toml that
-        # redirects every source to ./vendor) and build fully offline.
-        tar -xzf "$FLATPAK_BUILDER_BUILDDIR/cargo-vendor.tar.gz" -C "$src_dir"
+        # redirects every source to ./vendor) and build fully offline. The
+        # archive source is extracted flat: $PWD is the source root.
+        tar -xzf "$FLATPAK_BUILDER_BUILDDIR/cargo-vendor.tar.gz" -C .
         "$PNPM" config set store-dir "$PNPM_STORE_PATH"
         "$PNPM" config set dangerouslyAllowAllBuilds true
         "$PNPM" config set fetch-retries 7
